@@ -10,7 +10,7 @@ function Node:new(depth, s1, s2)
   self.__index = self
   setmetatable(o, self)
   o.depth = depth
-  o.modulus = s1(depth)
+  o.modulus = s1:func(depth)
   o.s1 = s1
   o.s2 = s2
   o.note_queue = {}
@@ -23,7 +23,7 @@ function Node:add_child()
 end
 
 function Node:add_note(n)
-  table.insert(self.note_queue, n)
+  table.insert(self.note_queue, self.s2:func(n) % 128)
 end
 
 function Node:popNote()

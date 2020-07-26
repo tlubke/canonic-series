@@ -1,9 +1,10 @@
 local Node = include 'canonic-series/lib/node'
+local Series = include 'canonic-series/lib/series'
 
-engine.name = "TestSine"
+engine.name = 'PolySub'
 
-s1 = function(d) return 2^d end
-s2 = function(d) return d + 12 end
+s1 = Series.modulus
+s2 = Series.note
 note_cnt = 0
 note_buf = {}
 
@@ -71,7 +72,6 @@ function trig(n)
   
   local add_notes = function(node)
     node:add_note(n)
-    n = node.s2(n) % 128
     if node.child == nil then node:add_child() end
   end
   
@@ -97,6 +97,7 @@ end
 
 function init()
  root = Node:new(0, s1, s2)
+ redraw()
 end
 
 function key(n, z)
@@ -104,4 +105,26 @@ function key(n, z)
     trig(1)
     note_buf = {}
   end
+end
+
+function enc(n, d)
+  local selected_series = s1
+  
+  if n == 2 then
+    selected_series:cycle_op(d)
+  end
+  
+   if n == 3 then
+    selected_series:add_to_var(d)
+  end
+  
+  redraw()
+end
+
+function redraw()
+  screen.clear()
+  screen.level(15)
+  screen.move(0,6)
+  screen.text("s1: "..tostring(s1))
+  screen.update()
 end
