@@ -5,6 +5,14 @@ engine.name = 'PolySub'
 
 s1 = Series.modulus
 s2 = Series.note
+s3 = Series.velocity
+ss = {
+  s1,
+  s2,
+  s3,
+}
+selected_s_cursor = 1
+selected_s = ss[selected_s_cursor]
 note_cnt = 0
 note_buf = {}
 
@@ -32,7 +40,7 @@ end
 -- if 'condition' is met, stops traversing.
 function iterate_doing_until(func, condition, n)
   local current = root
-  local i = 0
+  local i = 1
   
   repeat
     func(current)
@@ -60,35 +68,44 @@ end
 
 function print_buf()
   local s = "["
-  for i = 1, (#note_buf - 1) do
-    s = s..note_buf[i]..", "
+  for _, note in pairs(note_buf) do
+    s = s.."("..note.num..", "..note.vel.."), "
   end
-  s = s..note_buf[#note_buf].."]"
+  s = s.."]"
   print(s)
 end
 
-function trig(n)
+local pop_notes = function(node)
+  if note_cnt % node:modulus() == 0 then
+    node:pop_note()
+  end
+end
+  
+local print_queues = function(node)
+  node:print_queue()
+end
+
+local clear_queues = function(node)
+  node.note_queue = {}
+end
+
+function note_on(n)
+  root:add_note(n) 
   note_cnt = note_cnt + 1
   
-  local add_notes = function(node)
-    node:add_note(n)
-    if node.child == nil then node:add_child() end
-  end
-  
-  local node_untriggered = function(node)
-    return note_cnt % node.modulus ~= 0 
-  end
-    
-  local pop_notes = function(node)
-    if note_cnt % node.modulus == 0 then
-      node:popNote()
-    end
-  end
-  
-  traverse_doing_until(add_notes, node_untriggered, 8)
   traverse_doing(pop_notes)
   
   print_buf()
+  for _, note in pairs(note_buf) do
+    midi_device:note_on(note.num, note.vel, 1)
+  end
+end
+
+function all_notes_off()
+  for _, note in pairs(note_buf) do
+    midi_device:note_off(note.num, note.vel, 1)
+  end
+  note_buf ={}
 end
 
 --------------------
@@ -96,35 +113,79 @@ end
 --------------------
 
 function init()
- root = Node:new(0, s1, s2)
+  midi_device = midi.connect(3)
+  --midi_device.event = midi_event
+  root = Node:new(0, 0, s1, s2, s3)
+  local add_child = function(node)
+    node:add_child()
+  end
+  iterate_doing(add_child, 8)
  redraw()
 end
 
 function key(n, z)
   if z == 0 then
-    trig(1)
-    note_buf = {}
+    if n == 1 then
+      traverse_doing(clear_queues)
+      note_buf = {}
+      print("cleared")
+    end
+    
+    if n == 2 then
+      
+    end
+    
+    if n == 3 then
+      
+    end
   end
 end
-
 function enc(n, d)
-  local selected_series = s1
+  if n == 1 then
+    selected_s = ss[util.clamp(selected_s_cursor+d, 1, #ss)]
+  end
   
   if n == 2 then
-    selected_series:cycle_op(d)
+    selected_s:cycle_op(d)
   end
   
    if n == 3 then
-    selected_series:add_to_var(d)
+    selected_s:add_to_var(d)
   end
   
   redraw()
 end
 
+function midi.event(data)
+  local status_byte = data[1]
+  local note        = {num = data[2], vel = data[3]}
+  if is_note_on_event(status_byte) then
+    note_on(note)
+  end
+  if is_note_off_event(status_byte) then
+    all_notes_off()
+  end
+end
+
+function is_note_on_event(status_byte)
+  return status_byte >= 0x90 and status_byte <= 0x9F
+end
+
+function is_note_off_event(status_byte)
+  return status_byte >= 0x80 and status_byte <= 0x8F
+end
+
 function redraw()
   screen.clear()
-  screen.level(15)
   screen.move(0,6)
-  screen.text("s1: "..tostring(s1))
+  for n, s in pairs(ss) do
+    if selected_s == s then
+      screen.level(15)
+    else
+      screen.level(5)
+    end
+    screen.text(tostring(s))
+    screen.move(0, n*8 + 6)
+  end
   screen.update()
 end
